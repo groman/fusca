@@ -8,7 +8,7 @@ EXES:=$(patsubst $(TESTSRC)/%.cpp,$(BUILD)/%,$(wildcard $(TESTSRC)/*.cpp))
 
 all : $(EXES)
 
-$(BUILD)/% : $(TESTSRC)/%.cpp
+$(BUILD)/% : $(TESTSRC)/%.cpp include/fusca.h
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) $< -o $@
 
