@@ -1,0 +1,8 @@
+fusca - Stands for *f*ast *u*serpsace *s*ynchronized *c*lock *a*dapter
+
+A header-only C++ class for fast user-space access to a slow-to-read clock
+
+Synchronizes a fast-to-read userpsace clock (such as rdtsc) with a slow-to-read 
+clock such as PTP or clock_gettime()
+
+The clocks don't need to run at the same rates or use the same units
