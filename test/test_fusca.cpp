@@ -1,12 +1,13 @@
 #include <fusca.h>
 #include <x86intrin.h>
-#include <cstdio.h>
+#include <cstdio>
+#include <chrono>
 
 int main(int argc, char *argv[])
 {
   auto tscclock = []{ return __rdtsc(); };
-  auto slowclock = [] { return std::chrono::high_resolution_clock::now(); }
-  fusca adapter(slowclock, tscclock);
+  auto slowclock = [] { return std::chrono::high_resolution_clock::now(); };
+  auto adapter = make_fusca(slowclock, tscclock);
 
   for(int i = 0; i < 100; i++)
   {
