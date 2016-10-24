@@ -3,6 +3,9 @@
 #include <type_traits>
 #include <chrono>
 #include <thread>
+#include <atomic>
+#include <mutex>
+
 namespace fusca
 {
   typedef std::nano ns_t;
@@ -68,24 +71,39 @@ namespace fusca
       }
 
       template<typename to_t, typename from_t>
-      inline auto cast(const from_t & from) const
+      static inline auto cast(const from_t & from)
         -> typename std::enable_if<!std::is_arithmetic<to_t>::value, decltype(to_t(duration_cast<typename to_t::duration>(chrono_dur_t(std::declval<from_t>()))))>::type
       {
         return to_t(duration_cast<typename to_t::duration>(chrono_dur_t(from)));
       }
 
-      inline slow_val_t estimate() const
+      template<typename pred_t>
+      inline auto lockless_crit(pred_t pred) const
+        -> decltype(std::declval<pred_t>()())
       {
-        uint64_t start_seq, end_seq;
-        slow_val_t ret;
+        uint64_t start_seq1, start_seq2;
+        uint64_t end_seq1, end_seq2;
+        decltype(std::declval<pred_t>()()) ret;
+        // Variation on Bakery algorithm for redoing the predicate until the start and end sequence counters are the same and have not changed
+        // during execution
         do
         {
-          start_seq = m_seq_update_start;
-          fast_val_t fnow = m_fc();
-          ret = cast<slow_val_t>(m_c_sstart + m_c_speriod * (cast<compute_t>(fnow) - m_c_fstart) * m_c_fperiod_recip);
-          end_seq = m_seq_update_end;
-        } while(start_seq != end_seq);
+          start_seq1 = m_seq_update_start;
+          end_seq1 = m_seq_update_end;
+
+          ret = pred();
+
+          start_seq2 = m_seq_update_start;
+          end_seq2 = m_seq_update_end;
+        } while( (start_seq1 != start_seq2) || (end_seq1 != end_seq2) || (start_seq1 != end_seq1) );
         return ret;
+      }
+
+      inline slow_val_t estimate() const
+      {
+        return lockless_crit([&] {
+          return cast<slow_val_t>(m_c_sstart + m_c_speriod * (cast<compute_t>(m_fc()) - m_c_fstart) * m_c_fperiod_recip);
+        });
       }
       void init_clock()
       {
@@ -201,20 +219,14 @@ namespace fusca
       // This will resync if necessary
       inline slow_val_t operator()()
       {
-        uint64_t start_seq, end_seq;
-        slow_val_t ret;
-        // TOOD: Verify lockless logic
-        do
+        bool needSync = lockless_crit([&] {
+          return (cast<compute_t>(m_fc() - m_fstart) / cast<compute_t>(m_foverhead) > sync_interval);
+        });
+        if(needSync)
         {
-          start_seq = m_seq_update_start;
-          if(cast<compute_t>(m_fc() - m_fstart) / cast<compute_t>(m_foverhead) > sync_interval)
-          {
-            sync();
-          }
-          ret = estimate();
-          end_seq = m_seq_update_end;
-        } while(start_seq != end_seq);
-        return ret;
+          sync();
+        }
+        return estimate();
       }
 
   };
