@@ -1,6 +1,6 @@
 BUILD:=build/
 CXX:=clang++
-CXXFLAGS=-std=c++14 -O3 -Iinclude/
+CXXFLAGS=-std=c++11 -O3 -Iinclude/
 
 TESTSRC:=test
 
